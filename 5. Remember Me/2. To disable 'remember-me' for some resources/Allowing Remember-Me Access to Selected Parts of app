@@ -1,0 +1,27 @@
+Allowing Remember-Me Access to Selected Parts of the Application - 
+
+Replace the <security:intercept-url/> element you have in the file applicationContext-security.xml with the following one:
+<security:intercept-url pattern="/admin/*" access="ROLE_ADMIN,IS_AUTHENTICATED_FULLY" />
+
+You have added the access rule IS_AUTHENTICATED_FULLY to the access attribute. You still need more configuration to make this work. By default, Spring Security’s <http> element configures an AffirmativeBased access-decision manager. AffirmativeBased, grants access to a resource if any of the configured voters votes to grant access to the resource. By default, both the RoleVoter and the AuthenticatedVoter are configured in the manager, and the RoleVoter is queried first. The RoleVoter will vote to grant access, so the AuthenticatedVoter won’t be called at all.
+
+You need to define a UnanimousBased access-decision manager in your Spring Security configuration and
+reference that one from the <http> element.
+Let’s add the bean definition from Listing 4-15 to your applicationContext-security.xml. And make the <http> element’s opening tag look like the following:
+
+<security:http auto-config="true" access-decision-manager-ref="accessDecisionManager">.
+
+Listing 4-15 - Unanimous AccessDecisionManager
+
+<bean id="accessDecisionManager" class="org.springframework.security.access.vote.UnanimousBased">
+	<constructor-arg>
+		<list>
+			<bean class="org.springframework.security.access.vote.RoleVoter"/>
+			<bean class="org.springframework.security.access.vote.AuthenticatedVoter"/>
+		</list>
+	</constructor-arg>
+</bean>
+
+Restart the application, and visit the URL http://localhost:8080/admin/movies.
+This time, the access-decision manager calls the AuthenticatedVoter. The AuthenticatedVoter will see that the URL requires a fully authenticated user to access it, so it will query the requesting Authentication to see if it is fully authenticated. 
+The way this check takes place is straightforward: the voter simply checks if the Authentication object implementation is neither an AnonymousAuthenticationToken nor a RememberMeAuthenticationToken instance, assuming it is then a fully authenticated Authentication object and allowing access. In this case, access will be denied because the Authentication object is a remember-me implementation. This means that the access is denied and you'll see access denied page if configured one.
